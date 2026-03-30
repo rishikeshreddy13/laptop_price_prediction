@@ -60,19 +60,19 @@ if st.button('Predict Price'):
     Y_res = int(resolution.split('x')[1])
     ppi = ((X_res**2) + (Y_res**2))**0.5/screen_size
 
-query_data = {
-    'Company': [company],
-    'TypeName': [type],
-    'Ram': [ram],
-    'Weight': [weight],
-    'Touchscreen': [touchscreen],
-    'Ips': [ips],
-    'Cpu brand': [cpu],
-    'HDD': [hdd],
-    'SSD': [ssd],
-    'ppi': [ppi],
-    'Gpu Brand': [gpu],
-    'Os Brand': [os]
-}
-query_df = pd.DataFrame(query_data)
-st.title("The predicted price of this configuration is " + str(int(np.exp(pipe.predict(query_df)[0]))))
+    query_data = {
+        'Company': [company],
+        'TypeName': [type],
+        'Ram': [ram],
+        'Weight': [weight],
+        'Touchscreen': [touchscreen],
+        'Ips': [ips],
+        'Cpu brand': [cpu],
+        'HDD': [hdd],
+        'SSD': [ssd],
+        'ppi': [ppi],
+        'Gpu Brand': [gpu],
+        'Os Brand': [os]
+    }
+    query_df = pd.DataFrame(query_data)
+    st.title("The predicted price of this configuration is " + str(int(np.exp(pipe.predict(query_df)[0]))))
