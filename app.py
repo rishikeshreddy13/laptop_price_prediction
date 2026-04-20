@@ -1,20 +1,3 @@
-"""
-LaptopLens - Smart Laptop Price Advisor
-========================================
-Fixed version: all categorical values match exactly what the pipeline's
-OneHotEncoder was trained on (extracted from notebook outputs).
-
-Root cause of the original ValueError:
-  Gpu_convertor() in the notebook returns LOWERCASE strings:
-    'intel', 'nvidia', 'amd', 'others'
-  The old app was sending 'Intel', 'Nvidia' etc. → OHE had never seen those.
-
-Fix: GPU_DISPLAY dict maps user-friendly labels → exact lowercase pipeline values.
-     Same pattern applied to Os Brand for safety.
-
-Pipeline column order (indices [0,1,6,10,11] passed to OHE):
-  0  Company | 1 TypeName | 6 Cpu brand | 10 Gpu Brand | 11 Os Brand
-"""
 
 import streamlit as st
 import pandas as pd
@@ -32,8 +15,7 @@ st.set_page_config(
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 LOG_MAE               = 0.147   # best ensemble MAE from notebook (log-scale)
-OVERPRICED_THRESHOLD  =  0.12   # asking > fair + 12%  → Overpriced
-UNDERPRICED_THRESHOLD = -0.10   # asking < fair - 10%  → Great Deal
+
 
 # Exact values the OHE was fitted on — verified from notebook Cell 68/70 outputs
 COMPANIES = sorted([
@@ -81,13 +63,7 @@ def load_model():
 
 # ── Prediction ────────────────────────────────────────────────────────────────
 def predict_price(pipe, features: dict) -> dict:
-    """
-    Single-row prediction through the saved pipeline.
-    Columns must arrive in this exact order (matching x.head() output):
-      Company, TypeName, Ram, Weight, Touchscreen, Ips,
-      Cpu brand, HDD, SSD, ppi, Gpu Brand, Os Brand
-    Target was log(Price), so we exp() the result back to INR.
-    """
+   
     col_order = [
         "Company", "TypeName", "Ram", "Weight", "Touchscreen", "Ips",
         "Cpu brand", "HDD", "SSD", "ppi", "Gpu Brand", "Os Brand",
@@ -103,19 +79,38 @@ def predict_price(pipe, features: dict) -> dict:
 
 
 # ── Deal verdict ──────────────────────────────────────────────────────────────
-def deal_verdict(asking: int, predicted: int) -> dict | None:
+def deal_verdict(asking: int, predicted: int, lower: int, upper: int) -> dict | None:
     if asking <= 0:
         return None
+
     delta = (asking - predicted) / predicted
-    if delta > OVERPRICED_THRESHOLD:
-        return dict(label="Overpriced", colour="#ff4b4b", emoji="🔴", delta=delta,
-                    message=f"Asking price is **{abs(delta)*100:.1f}% above** fair market value. Negotiate hard or look for alternatives.")
-    elif delta < UNDERPRICED_THRESHOLD:
-        return dict(label="Great Deal", colour="#21c354", emoji="🟢", delta=delta,
-                    message=f"Asking price is **{abs(delta)*100:.1f}% below** fair market value. This looks like a steal — act fast!")
+
+    if asking > upper:
+        return dict(
+            label="Overpriced",
+            colour="#ff4b4b",
+            emoji="🔴",
+            delta=delta,
+            message="Asking price is above the expected market range. Negotiate or look for alternatives."
+        )
+
+    elif asking < lower:
+        return dict(
+            label="Great Deal",
+            colour="#21c354",
+            emoji="🟢",
+            delta=delta,
+            message="Asking price is below the expected market range. This looks like a strong deal."
+        )
+
     else:
-        return dict(label="Fair Price", colour="#f4a261", emoji="🟡", delta=delta,
-                    message=f"Asking price is within ±{abs(delta)*100:.1f}% of fair value. This is a reasonable deal.")
+        return dict(
+            label="Fair Price",
+            colour="#f4a261",
+            emoji="🟡",
+            delta=delta,
+            message="Asking price falls within the expected market range. This is reasonable."
+        )
 
 
 # ── Insight engine ────────────────────────────────────────────────────────────
@@ -319,7 +314,12 @@ def render_main(pipe, user_input: dict):
         """, unsafe_allow_html=True)
 
         if asking_price > 0:
-            v = deal_verdict(asking_price, result["predicted_inr"])
+            v = deal_verdict(
+                    asking_price,
+                    result["predicted_inr"],
+                    result["lower_inr"],
+                    result["upper_inr"]
+                )
             if v:
                 d = f"{'+'if v['delta']>0 else ''}{v['delta']*100:.1f}%"
                 st.markdown(f"""
@@ -409,7 +409,12 @@ def render_main(pipe, user_input: dict):
             f"Confidence    : ₹{result['lower_inr']:,} – ₹{result['upper_inr']:,}",
         ]
         if asking_price > 0:
-            v = deal_verdict(asking_price, result["predicted_inr"])
+            v = deal_verdict(
+                    asking_price,
+                    result["predicted_inr"],
+                    result["lower_inr"],
+                    result["upper_inr"]
+                )
             lines += [
                 f"Asking Price  : ₹{asking_price:,}",
                 f"Verdict       : {v['emoji']} {v['label']}  ({v['delta']*100:+.1f}%)",
