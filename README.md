@@ -1,4 +1,4 @@
-#💻 Laptop Price Predictor using Machine Learning
+# 💻 LaptopLens – Laptop Price Predictor using Machine Learning
 
 An intelligent machine learning application that predicts the **fair market price of laptops** based on their hardware specifications. Unlike traditional pricing methods that rely on model numbers, LaptopLens evaluates the complete hardware configuration ("Hardware DNA") to estimate the actual value of a laptop.
 
